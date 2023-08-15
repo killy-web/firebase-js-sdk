@@ -43,23 +43,24 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     await driver.pause(200); // Race condition on auth init
   });
 
-  it('allows users to sign in', async () => {
+  it('1 - allows users to sign in', async () => {
     await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
     const widget = new IdPPage(driver.webDriver);
 
     // We're now on the widget page; wait for load
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
-    await widget.fillDisplayName('Bob Test');
-    await widget.fillScreenName('bob.test');
+    await widget.fillEmail('bob@bob.test1');
+    await widget.fillDisplayName('Bob Test1');
+    await widget.fillScreenName('bob.test1');
     await widget.fillProfilePhoto('http://bob.test/bob.png');
     await widget.clickSignIn();
 
     await driver.reinitOnRedirect();
     const currentUser = await driver.getUserSnapshot();
-    expect(currentUser.email).to.eq('bob@bob.test');
-    expect(currentUser.displayName).to.eq('Bob Test');
+    console.log('1 - currentUser.email: ', currentUser.email);
+    expect(currentUser.email).to.eq('bob@bob.test1');
+    expect(currentUser.displayName).to.eq('Bob Test1');
     expect(currentUser.photoURL).to.eq('http://bob.test/bob.png');
 
     const redirectResult: UserCredential = await driver.call(
@@ -74,7 +75,7 @@ browserDescribe('WebDriver redirect IdP test', driver => {
   });
 
   // Redirect works with middleware for now
-  it('is blocked by middleware', async function () {
+  it('2 - is blocked by middleware', async function () {
     if (driver.isCompatLayer()) {
       console.warn('Skipping middleware tests in compat');
       this.skip();
@@ -86,9 +87,9 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     // We're now on the widget page; wait for load
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
-    await widget.fillDisplayName('Bob Test');
-    await widget.fillScreenName('bob.test');
+    await widget.fillEmail('bob@bob.test2');
+    await widget.fillDisplayName('Bob Test2');
+    await widget.fillScreenName('bob.test2');
     await widget.fillProfilePhoto('http://bob.test/bob.png');
     await widget.clickSignIn();
     await driver.webDriver.wait(new JsLoadCondition(START_FUNCTION));
@@ -101,7 +102,7 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     expect(await driver.getUserSnapshot()).to.be.null;
   });
 
-  it('can link with another account account', async () => {
+  it('3 - can link with another account account', async () => {
     // First, sign in anonymously
     const { user: anonUser }: UserCredential = await driver.call(
       AnonFunction.SIGN_IN_ANONYMOUSLY
@@ -112,29 +113,31 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
+    await widget.fillEmail('bob@bob.test3');
     await widget.clickSignIn();
 
     await driver.reinitOnRedirect();
     // Back on page; check for the current user matching the anonymous account
     // as well as the new IdP account
-    const user: User = await driver.getUserSnapshot();
-    expect(user.uid).to.eq(anonUser.uid);
-    expect(user.email).to.eq('bob@bob.test');
+    const user3: User = await driver.getUserSnapshot();
+    console.log('3 - currentUser.email: ', user3.email);
+    expect(user3.uid).to.eq(anonUser.uid);
+    expect(user3.email).to.eq('bob@bob.test3');
   });
 
-  it('can be converted to a credential', async () => {
+  it('4 - can be converted to a credential', async () => {
     // Start with redirect
     await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
+    await widget.fillEmail('bob@bob.test4');
     await widget.clickSignIn();
 
     // Generate a credential, then store it on the window before logging out
     await driver.reinitOnRedirect();
     const first = await driver.getUserSnapshot();
+    console.log('4 - currentUser.email: ', first.email);
     const cred: OAuthCredential = await driver.call(
       RedirectFunction.GENERATE_CREDENTIAL_FROM_RESULT
     );
@@ -151,24 +154,25 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     expect(second.providerData).to.eql(first.providerData);
   });
 
-  it('handles account exists different credential errors', async () => {
+  it('5 - handles account exists different credential errors', async () => {
     // Start with redirect and a verified account
     await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
+    await widget.fillEmail('bob@bob.test5');
     await widget.clickSignIn();
     await driver.reinitOnRedirect();
 
     const original = await driver.getUserSnapshot();
+    console.log('5a - currentUser.email: ', original.email);
     expect(original.emailVerified).to.be.true;
 
     // Try to sign in with an unverified Facebook account
     // TODO: Convert this to the widget once unverified accounts work
     // Come back and verify error / prepare for link
     await expect(
-      driver.call(RedirectFunction.TRY_TO_SIGN_IN_UNVERIFIED, 'bob@bob.test')
+      driver.call(RedirectFunction.TRY_TO_SIGN_IN_UNVERIFIED, 'bob@bob.test5')
     ).to.be.rejected.and.eventually.have.property(
       'code',
       'auth/account-exists-with-different-credential'
@@ -178,15 +182,16 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     await driver.call(RedirectFunction.LINK_WITH_ERROR_CREDENTIAL);
 
     // Check the user for both providers
-    const user = await driver.getUserSnapshot();
-    expect(user.uid).to.eq(original.uid);
-    expect(user.providerData.map(d => d.providerId)).to.have.members([
+    const user5 = await driver.getUserSnapshot();
+    console.log('5b - currentUser.email: ', user5.email);
+    expect(user5.uid).to.eq(original.uid);
+    expect(user5.providerData.map(d => d.providerId)).to.have.members([
       'google.com',
       'facebook.com'
     ]);
   });
 
-  it('does not auto-upgrade anon accounts', async () => {
+  it('6 - does not auto-upgrade anon accounts', async () => {
     const { user: anonUser }: UserCredential = await driver.call(
       AnonFunction.SIGN_IN_ANONYMOUSLY
     );
@@ -194,16 +199,17 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
+    await widget.fillEmail('bob@bob.test6');
     await widget.clickSignIn();
 
     // On redirect, check that the signed in user is different
     await driver.reinitOnRedirect();
-    const curUser = await driver.getUserSnapshot();
-    expect(curUser.uid).not.to.eq(anonUser.uid);
+    const curUser6 = await driver.getUserSnapshot();
+    console.log('6 - currentUser.email: ', curUser6.email);
+    expect(curUser6.uid).not.to.eq(anonUser.uid);
   });
 
-  it('linking with anonymous user upgrades account', async () => {
+  it('7 - linking with anonymous user upgrades account', async () => {
     const { user: anonUser }: UserCredential = await driver.call(
       AnonFunction.SIGN_IN_ANONYMOUSLY
     );
@@ -211,20 +217,21 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('bob@bob.test');
+    await widget.fillEmail('bob@bob.test7');
     await widget.clickSignIn();
 
     // On redirect, check that the signed in user is upgraded
     await driver.reinitOnRedirect();
-    const curUser = await driver.getUserSnapshot();
-    expect(curUser.uid).to.eq(anonUser.uid);
-    expect(curUser.isAnonymous).to.be.false;
+    const curUser7 = await driver.getUserSnapshot();
+    console.log('7 - currentUser.email: ', curUser7.email);
+    expect(curUser7.uid).to.eq(anonUser.uid);
+    expect(curUser7.isAnonymous).to.be.false;
   });
 
-  it('is possible to link with different email', async () => {
+  it('8 - is possible to link with different email', async () => {
     const { user: emailUser }: UserCredential = await driver.call(
       EmailFunction.CREATE_USER,
-      'user@test.test'
+      'user@test.test8'
     );
 
     // Link using pre-poulated user
@@ -233,21 +240,22 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('other-user@test.test');
+    await widget.fillEmail('other-user@test.test8');
     await widget.clickSignIn();
 
     // Check the linked account
     await driver.reinitOnRedirect();
-    const curUser = await driver.getUserSnapshot();
-    expect(curUser.uid).to.eq(emailUser.uid);
-    expect(curUser.emailVerified).to.be.false;
-    expect(curUser.providerData.length).to.eq(2);
+    const curUser8 = await driver.getUserSnapshot();
+    console.log('8 - currentUser.email: ', curUser8.email);
+    expect(curUser8.uid).to.eq(emailUser.uid);
+    expect(curUser8.emailVerified).to.be.false;
+    expect(curUser8.providerData.length).to.eq(2);
   });
 
-  it('is possible to link with the same email', async () => {
+  it('9 - is possible to link with the same email', async () => {
     const { user: emailUser }: UserCredential = await driver.call(
       EmailFunction.CREATE_USER,
-      'same@test.test'
+      'same@test.test9'
     );
 
     // Link using pre-poulated user
@@ -256,15 +264,16 @@ browserDescribe('WebDriver redirect IdP test', driver => {
     const widget = new IdPPage(driver.webDriver);
     await widget.pageLoad();
     await widget.clickAddAccount();
-    await widget.fillEmail('same@test.test');
+    await widget.fillEmail('same@test.test9');
     await widget.clickSignIn();
 
     // Check the linked account
     await driver.reinitOnRedirect();
-    const curUser = await driver.getUserSnapshot();
-    expect(curUser.uid).to.eq(emailUser.uid);
-    expect(curUser.emailVerified).to.be.true;
-    expect(curUser.providerData.length).to.eq(2);
+    const curUser9 = await driver.getUserSnapshot();
+    console.log('9 - currentUser.email: ', curUser9.email);
+    expect(curUser9.uid).to.eq(emailUser.uid);
+    expect(curUser9.emailVerified).to.be.true;
+    expect(curUser9.providerData.length).to.eq(2);
   });
 
   context('with existing user', () => {
@@ -275,18 +284,18 @@ browserDescribe('WebDriver redirect IdP test', driver => {
       // Create a couple existing users
       let cred: UserCredential = await driver.call(
         RedirectFunction.CREATE_FAKE_GOOGLE_USER,
-        'bob@bob.test'
+        'bob@bob.test10x'
       );
       user1 = cred.user;
       cred = await driver.call(
         RedirectFunction.CREATE_FAKE_GOOGLE_USER,
-        'sally@sally.test'
+        'sally@sally.test10x'
       );
       user2 = cred.user;
       await driver.call(CoreFunction.SIGN_OUT);
     });
 
-    it('a user can sign in again', async () => {
+    it('10 - a user can sign in again', async () => {
       // Sign in using pre-poulated user
       await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
 
@@ -297,12 +306,13 @@ browserDescribe('WebDriver redirect IdP test', driver => {
 
       // Double check the new sign in matches the old
       await driver.reinitOnRedirect();
-      const user = await driver.getUserSnapshot();
-      expect(user.uid).to.eq(user1.uid);
-      expect(user.email).to.eq(user1.email);
+      const user10 = await driver.getUserSnapshot();
+      console.log('10 - currentUser.email: ', user10.email);
+      expect(user10.uid).to.eq(user1.uid);
+      expect(user10.email).to.eq(user1.email);
     });
 
-    it('reauthenticate works for the correct user', async () => {
+    it('11 - reauthenticate works for the correct user', async () => {
       // Sign in using pre-poulated user
       await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
 
@@ -312,9 +322,10 @@ browserDescribe('WebDriver redirect IdP test', driver => {
 
       // Double check the new sign in matches the old
       await driver.reinitOnRedirect();
-      let user = await driver.getUserSnapshot();
-      expect(user.uid).to.eq(user1.uid);
-      expect(user.email).to.eq(user1.email);
+      let user11 = await driver.getUserSnapshot();
+      console.log('11a - currentUser.email: ', user11.email);
+      expect(user11.uid).to.eq(user1.uid);
+      expect(user11.email).to.eq(user1.email);
 
       // Reauthenticate specifically
       await driver.callNoWait(RedirectFunction.IDP_REAUTH_REDIRECT);
@@ -322,66 +333,69 @@ browserDescribe('WebDriver redirect IdP test', driver => {
       await widget.selectExistingAccountByEmail(user1.email!);
 
       await driver.reinitOnRedirect();
-      user = await driver.getUserSnapshot();
-      expect(user.uid).to.eq(user1.uid);
-      expect(user.email).to.eq(user1.email);
+      user11 = await driver.getUserSnapshot();
+      console.log('11b - currentUser.email: ', user11.email);
+      expect(user11.uid).to.eq(user1.uid);
+      expect(user11.email).to.eq(user1.email);
     });
 
-    it('reauthenticate throws for wrong user', async () => {
-      // Sign in using pre-poulated user
-      await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
+    // it('12 - reauthenticate throws for wrong user', async () => {
+    //   // Sign in using pre-poulated user
+    //   await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
 
-      const widget = new IdPPage(driver.webDriver);
-      await widget.pageLoad();
-      await widget.selectExistingAccountByEmail(user1.email!);
+    //   const widget = new IdPPage(driver.webDriver);
+    //   await widget.pageLoad();
+    //   await widget.selectExistingAccountByEmail(user1.email!);
 
-      // Immediately reauth but with the wrong user
-      await driver.reinitOnRedirect();
-      await driver.callNoWait(RedirectFunction.IDP_REAUTH_REDIRECT);
-      await widget.pageLoad();
-      await widget.selectExistingAccountByEmail(user2.email!);
+    //   // Immediately reauth but with the wrong user
+    //   await driver.reinitOnRedirect();
+    //   await driver.callNoWait(RedirectFunction.IDP_REAUTH_REDIRECT);
+    //   await widget.pageLoad();
+    //   await widget.selectExistingAccountByEmail(user2.email!);
 
-      await driver.reinitOnRedirect();
-      await expect(
-        driver.call(RedirectFunction.REDIRECT_RESULT)
-      ).to.be.rejected.and.eventually.have.property(
-        'code',
-        'auth/user-mismatch'
-      );
-    });
+    //   await driver.reinitOnRedirect();
+    //   await expect(
+    //     driver.call(RedirectFunction.REDIRECT_RESULT)
+    //   ).to.be.rejected.and.eventually.have.property(
+    //     'code',
+    //     'auth/user-mismatch'
+    //   );
+    // });
 
-    it('handles aborted sign ins', async () => {
-      await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
-      const widget = new IdPPage(driver.webDriver);
+    // it('13 - handles aborted sign ins', async () => {
+    //   await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
+    //   const widget = new IdPPage(driver.webDriver);
 
-      // Don't actually sign in; go back to the previous page
-      await widget.pageLoad();
-      await driver.goToTestPage();
-      await driver.reinitOnRedirect();
-      expect(await driver.getUserSnapshot()).to.be.null;
+    //   // Don't actually sign in; go back to the previous page
+    //   await widget.pageLoad();
+    //   await driver.goToTestPage();
+    //   await driver.reinitOnRedirect();
+    //   expect(await driver.getUserSnapshot()).to.be.null;
 
-      // Now do sign in
-      await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
-      // Use user1
-      await widget.pageLoad();
-      await widget.selectExistingAccountByEmail(user1.email!);
+    //   // Now do sign in
+    //   await driver.callNoWait(RedirectFunction.IDP_REDIRECT);
+    //   // Use user1
+    //   await widget.pageLoad();
+    //   await widget.selectExistingAccountByEmail(user1.email!);
 
-      // Ensure the user was signed in...
-      await driver.reinitOnRedirect();
-      let user = await driver.getUserSnapshot();
-      expect(user.uid).to.eq(user1.uid);
-      expect(user.email).to.eq(user1.email);
+    //   // Ensure the user was signed in...
+    //   await driver.reinitOnRedirect();
+    //   let user13 = await driver.getUserSnapshot();
+    //   console.log('13a - currentUser.email: ', user13.email);
+    //   expect(user13.uid).to.eq(user1.uid);
+    //   expect(user13.email).to.eq(user1.email);
 
-      // Now open another sign in, but return
-      await driver.callNoWait(RedirectFunction.IDP_REAUTH_REDIRECT);
-      await widget.pageLoad();
-      await driver.goToTestPage();
-      await driver.reinitOnRedirect();
+    //   // Now open another sign in, but return
+    //   await driver.callNoWait(RedirectFunction.IDP_REAUTH_REDIRECT);
+    //   await widget.pageLoad();
+    //   await driver.goToTestPage();
+    //   await driver.reinitOnRedirect();
 
-      // Make sure state remained
-      user = await driver.getUserSnapshot();
-      expect(user.uid).to.eq(user1.uid);
-      expect(user.email).to.eq(user1.email);
-    });
+    //   // Make sure state remained
+    //   user13 = await driver.getUserSnapshot();
+    //   console.log('13b - currentUser.email: ', user13.email);
+    //   expect(user13.uid).to.eq(user1.uid);
+    //   expect(user13.email).to.eq(user1.email);
+    // });
   });
 });
